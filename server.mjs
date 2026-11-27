@@ -1,25 +1,16 @@
-import {
-  createHmac,
-  scryptSync,
-  timingSafeEqual,
-} from 'node:crypto'
-import {
-  createReadStream,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs'
+import { existsSync, createReadStream, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import contentHandler from './api/content.mjs'
+import loginHandler from './api/login.mjs'
+import logoutHandler from './api/logout.mjs'
+import sessionHandler from './api/session.mjs'
+import { getAuthConfig } from './lib/config.mjs'
+import { readSessionFromCookie } from './lib/session.mjs'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const distDir = join(root, 'dist')
-const dataDir = join(root, 'data')
-const contentFile = join(dataDir, 'content.json')
 const envFile = join(root, '.env.server')
 
 function loadEnv() {
@@ -39,23 +30,12 @@ function loadEnv() {
 loadEnv()
 
 const PORT = Number(process.env.PORT || 3000)
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase()
-const PASSWORD_HASH = (process.env.ADMIN_PASSWORD_HASH || '').trim()
-const SESSION_SECRET = process.env.SESSION_SECRET || ''
-const COOKIE_NAME = 'misha_admin'
-const SESSION_MAX_AGE = 60 * 60 * 8
-const COOKIE_SECURE = (process.env.COOKIE_SECURE || (process.env.NODE_ENV === 'production' ? 'true' : 'false')) === 'true'
-const MAX_BODY_BYTES = 2_500_000
-const LOGIN_WINDOW_MS = 10 * 60 * 1000
-const LOGIN_MAX_ATTEMPTS = 5
+const authConfig = getAuthConfig()
 
-if (!ADMIN_EMAIL || !PASSWORD_HASH || SESSION_SECRET.length < 32) {
+if (!authConfig.email || !authConfig.hash || authConfig.secret.length < 32) {
   console.error('Missing server auth config. Set ADMIN_EMAIL, ADMIN_PASSWORD_HASH and SESSION_SECRET (32+ chars) in .env.server')
   process.exit(1)
 }
-
-mkdirSync(dataDir, { recursive: true })
-if (!existsSync(contentFile)) writeFileSync(contentFile, '{}\n', 'utf8')
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -75,241 +55,40 @@ const mimeTypes = {
   '.woff2': 'font/woff2',
 }
 
-const loginAttempts = new Map()
-
-function safeEqual(left, right) {
-  const a = Buffer.from(left)
-  const b = Buffer.from(right)
-  if (a.length !== b.length) return false
-  return timingSafeEqual(a, b)
+const apiHandlers = {
+  '/api/session': sessionHandler,
+  '/api/login': loginHandler,
+  '/api/logout': logoutHandler,
+  '/api/content': contentHandler,
 }
 
-function verifyPassword(password) {
-  try {
-    const [scheme, saltHex, hashHex] = PASSWORD_HASH.split('$')
-    if (scheme !== 'scrypt' || !saltHex || !hashHex) return false
-    const expected = Buffer.from(hashHex, 'hex')
-    if (expected.length !== 64) return false
-    const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length)
-    return timingSafeEqual(actual, expected)
-  } catch {
-    return false
-  }
-}
-
-function signSession(payload) {
-  const data = Buffer.from(JSON.stringify(payload)).toString('base64url')
-  const signature = createHmac('sha256', SESSION_SECRET).update(data).digest('base64url')
-  return `${data}.${signature}`
-}
-
-function readSession(request) {
-  const cookies = (request.headers.cookie || '')
-    .split(';')
-    .map((part) => part.trim().split('='))
-  const entry = cookies.find(([key]) => key === COOKIE_NAME)
-  if (!entry || !entry[1]) return null
-
-  const [data, signature] = entry[1].split('.')
-  if (!data || !signature) return null
-  const expected = createHmac('sha256', SESSION_SECRET).update(data).digest('base64url')
-  if (!safeEqual(signature, expected)) return null
-
-  try {
-    const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'))
-    if (payload.email !== ADMIN_EMAIL || typeof payload.exp !== 'number' || payload.exp < Date.now()) return null
-    return payload
-  } catch {
-    return null
-  }
-}
-
-function cookieHeader(value, maxAge) {
-  const parts = [
-    `${COOKIE_NAME}=${value}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${maxAge}`,
-  ]
-  if (COOKIE_SECURE) parts.push('Secure')
-  return parts.join('; ')
-}
-
-function sendJson(response, status, body, headers = {}) {
-  response.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store',
-    ...headers,
+async function toWebRequest(request, pathname) {
+  const headers = new Headers()
+  Object.entries(request.headers).forEach(([key, value]) => {
+    if (Array.isArray(value)) value.forEach((entry) => headers.append(key, entry))
+    else if (value !== undefined) headers.set(key, value)
   })
-  response.end(JSON.stringify(body))
-}
 
-function readJson(request) {
-  return new Promise((resolve, reject) => {
+  let body
+  if (['POST', 'PUT', 'PATCH'].includes(request.method || '')) {
     const chunks = []
-    let size = 0
-    request.on('data', (chunk) => {
-      size += chunk.length
-      if (size > MAX_BODY_BYTES) {
-        reject(new Error('Request body too large'))
-        request.destroy()
-        return
-      }
-      chunks.push(chunk)
-    })
-    request.on('end', () => {
-      try {
-        const text = Buffer.concat(chunks).toString('utf8')
-        resolve(text ? JSON.parse(text) : {})
-      } catch {
-        reject(new Error('Invalid JSON body'))
-      }
-    })
-    request.on('error', reject)
+    for await (const chunk of request) chunks.push(Buffer.from(chunk))
+    body = Buffer.concat(chunks)
+  }
+
+  const url = new URL(request.url || '/', `http://${request.headers.host || `localhost:${PORT}`}`)
+  url.pathname = pathname
+  return new Request(url, { method: request.method || 'GET', headers, body })
+}
+
+async function sendWebResponse(response, result) {
+  const headers = {}
+  result.headers.forEach((value, key) => {
+    headers[key] = value
   })
-}
-
-function originAllowed(request) {
-  const origin = request.headers.origin
-  if (!origin) return true
-  try {
-    return new URL(origin).host === request.headers.host
-  } catch {
-    return false
-  }
-}
-
-function clientIp(request) {
-  return request.socket.remoteAddress || 'unknown'
-}
-
-function rateLimited(ip) {
-  const now = Date.now()
-  const recent = (loginAttempts.get(ip) || []).filter((time) => now - time < LOGIN_WINDOW_MS)
-  loginAttempts.set(ip, recent)
-  return recent.length >= LOGIN_MAX_ATTEMPTS
-}
-
-function recordFailure(ip) {
-  const recent = loginAttempts.get(ip) || []
-  loginAttempts.set(ip, [...recent, Date.now()])
-}
-
-function clearFailures(ip) {
-  loginAttempts.delete(ip)
-}
-
-function hasUnsafeKeys(value) {
-  if (!value || typeof value !== 'object') return false
-  if (Array.isArray(value)) return value.some(hasUnsafeKeys)
-  return Object.entries(value).some(([key, child]) => {
-    if (['__proto__', 'constructor', 'prototype'].includes(key)) return true
-    return hasUnsafeKeys(child)
-  })
-}
-
-function readContent() {
-  try {
-    return JSON.parse(readFileSync(contentFile, 'utf8'))
-  } catch {
-    return {}
-  }
-}
-
-function writeContent(content) {
-  const temporary = `${contentFile}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(content, null, 2)}\n`, 'utf8')
-  renameSync(temporary, contentFile)
-}
-
-async function handleApi(request, response, pathname) {
-  const method = request.method || 'GET'
-
-  if (pathname === '/api/session' && method === 'GET') {
-    const session = readSession(request)
-    sendJson(response, 200, { authenticated: Boolean(session), email: session?.email ?? null })
-    return
-  }
-
-  if (pathname === '/api/content' && method === 'GET') {
-    sendJson(response, 200, readContent())
-    return
-  }
-
-  if (['/api/login', '/api/logout', '/api/content'].includes(pathname)) {
-    if (!originAllowed(request)) {
-      sendJson(response, 403, { error: 'Cross-origin requests are not allowed.' })
-      return
-    }
-    if (['POST', 'PUT'].includes(method) && !String(request.headers['content-type'] || '').startsWith('application/json')) {
-      sendJson(response, 415, { error: 'Content-Type must be application/json.' })
-      return
-    }
-  }
-
-  if (pathname === '/api/login' && method === 'POST') {
-    const ip = clientIp(request)
-    if (rateLimited(ip)) {
-      sendJson(response, 429, { error: 'Too many attempts. Try again in a few minutes.' })
-      return
-    }
-
-    let body
-    try {
-      body = await readJson(request)
-    } catch (error) {
-      sendJson(response, 400, { error: error.message })
-      return
-    }
-
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-    const password = typeof body.password === 'string' ? body.password : ''
-    const emailMatches = safeEqual(email, ADMIN_EMAIL)
-    const passwordMatches = verifyPassword(password)
-
-    if (!emailMatches || !passwordMatches) {
-      recordFailure(ip)
-      sendJson(response, 401, { error: 'Incorrect email or password.' })
-      return
-    }
-
-    clearFailures(ip)
-    const session = signSession({ email: ADMIN_EMAIL, exp: Date.now() + SESSION_MAX_AGE * 1000 })
-    sendJson(response, 200, { ok: true }, { 'Set-Cookie': cookieHeader(session, SESSION_MAX_AGE) })
-    return
-  }
-
-  if (pathname === '/api/logout' && method === 'POST') {
-    sendJson(response, 200, { ok: true }, { 'Set-Cookie': cookieHeader('', 0) })
-    return
-  }
-
-  if (pathname === '/api/content' && method === 'PUT') {
-    if (!readSession(request)) {
-      sendJson(response, 401, { error: 'Sign in to change content.' })
-      return
-    }
-
-    let body
-    try {
-      body = await readJson(request)
-    } catch (error) {
-      sendJson(response, 400, { error: error.message })
-      return
-    }
-
-    if (!body || typeof body !== 'object' || Array.isArray(body) || hasUnsafeKeys(body)) {
-      sendJson(response, 400, { error: 'Invalid content payload.' })
-      return
-    }
-
-    writeContent(body)
-    sendJson(response, 200, { ok: true })
-    return
-  }
-
-  sendJson(response, 404, { error: 'Not found.' })
+  response.writeHead(result.status, headers)
+  if (result.body) response.end(Buffer.from(await result.arrayBuffer()))
+  else response.end()
 }
 
 function serveStatic(request, response, pathname) {
@@ -355,7 +134,7 @@ function serveStatic(request, response, pathname) {
   createReadStream(target).pipe(response)
 }
 
-const server = createServer((request, response) => {
+async function handleRequest(request, response) {
   response.setHeader('X-Content-Type-Options', 'nosniff')
   response.setHeader('X-Frame-Options', 'DENY')
   response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
@@ -369,31 +148,43 @@ const server = createServer((request, response) => {
     return
   }
 
-  if (pathname.startsWith('/api/')) {
-    handleApi(request, response, pathname).catch((error) => {
-      sendJson(response, 500, { error: error.message || 'Server error.' })
-    })
+  const handler = apiHandlers[pathname]
+  if (handler) {
+    const webRequest = await toWebRequest(request, pathname)
+    const result = await handler(webRequest)
+    await sendWebResponse(response, result)
     return
   }
 
   const normalized = pathname.replace(/\/+$/, '') || '/'
   const isAdminRoute = normalized === '/admin' || normalized.startsWith('/admin/')
   const isLoginRoute = normalized === '/login' || normalized.startsWith('/login/')
-  const authenticated = Boolean(readSession(request))
+  const session = await readSessionFromCookie(request.headers.cookie)
 
-  if (isAdminRoute && !authenticated) {
+  if (isAdminRoute && !session) {
     response.writeHead(303, { Location: '/login', 'Cache-Control': 'no-store' })
     response.end()
     return
   }
 
-  if (isLoginRoute && authenticated) {
+  if (isLoginRoute && session) {
     response.writeHead(303, { Location: '/admin', 'Cache-Control': 'no-store' })
     response.end()
     return
   }
 
   serveStatic(request, response, pathname)
+}
+
+const server = createServer((request, response) => {
+  handleRequest(request, response).catch((error) => {
+    if (response.headersSent) {
+      response.end()
+      return
+    }
+    response.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' })
+    response.end(JSON.stringify({ error: error.message || 'Server error.' }))
+  })
 })
 
 server.listen(PORT, '0.0.0.0', () => {
