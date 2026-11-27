@@ -62,35 +62,6 @@ const apiHandlers = {
   '/api/content': contentHandler,
 }
 
-async function toWebRequest(request, pathname) {
-  const headers = new Headers()
-  Object.entries(request.headers).forEach(([key, value]) => {
-    if (Array.isArray(value)) value.forEach((entry) => headers.append(key, entry))
-    else if (value !== undefined) headers.set(key, value)
-  })
-
-  let body
-  if (['POST', 'PUT', 'PATCH'].includes(request.method || '')) {
-    const chunks = []
-    for await (const chunk of request) chunks.push(Buffer.from(chunk))
-    body = Buffer.concat(chunks)
-  }
-
-  const url = new URL(request.url || '/', `http://${request.headers.host || `localhost:${PORT}`}`)
-  url.pathname = pathname
-  return new Request(url, { method: request.method || 'GET', headers, body })
-}
-
-async function sendWebResponse(response, result) {
-  const headers = {}
-  result.headers.forEach((value, key) => {
-    headers[key] = value
-  })
-  response.writeHead(result.status, headers)
-  if (result.body) response.end(Buffer.from(await result.arrayBuffer()))
-  else response.end()
-}
-
 function serveStatic(request, response, pathname) {
   let decoded
   try {
@@ -150,9 +121,7 @@ async function handleRequest(request, response) {
 
   const handler = apiHandlers[pathname]
   if (handler) {
-    const webRequest = await toWebRequest(request, pathname)
-    const result = await handler(webRequest)
-    await sendWebResponse(response, result)
+    await handler(request, response)
     return
   }
 

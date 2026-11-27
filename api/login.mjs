@@ -5,31 +5,31 @@ import {
   emailMatches,
   isJsonRequest,
   isRateLimited,
-  json,
   originAllowed,
   readJson,
   recordFailure,
+  sendJson,
 } from '../lib/api.mjs'
 import { getAuthConfig, SESSION_MAX_AGE } from '../lib/config.mjs'
 import { verifyPassword } from '../lib/password.mjs'
 import { signSession } from '../lib/session.mjs'
 
-export default async function handler(request) {
-  if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405, { Allow: 'POST' })
-  if (!originAllowed(request)) return json({ error: 'Cross-origin requests are not allowed.' }, 403)
-  if (!isJsonRequest(request)) return json({ error: 'Content-Type must be application/json.' }, 415)
+export default async function handler(request, response) {
+  if (request.method !== 'POST') return sendJson(response, 405, { error: 'Method not allowed.' }, { Allow: 'POST' })
+  if (!originAllowed(request)) return sendJson(response, 403, { error: 'Cross-origin requests are not allowed.' })
+  if (!isJsonRequest(request)) return sendJson(response, 415, { error: 'Content-Type must be application/json.' })
 
   const { email: configuredEmail, secret } = getAuthConfig()
-  if (!configuredEmail || secret.length < 32) return json({ error: 'Server auth is not configured.' }, 500)
+  if (!configuredEmail || secret.length < 32) return sendJson(response, 500, { error: 'Server auth is not configured.' })
 
   const ip = clientIp(request)
-  if (isRateLimited(ip)) return json({ error: 'Too many attempts. Try again in a few minutes.' }, 429)
+  if (isRateLimited(ip)) return sendJson(response, 429, { error: 'Too many attempts. Try again in a few minutes.' })
 
   let body
   try {
     body = await readJson(request)
   } catch (error) {
-    return json({ error: error.message }, 400)
+    return sendJson(response, 400, { error: error.message })
   }
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
@@ -37,10 +37,10 @@ export default async function handler(request) {
 
   if (!emailMatches(email) || !verifyPassword(password)) {
     recordFailure(ip)
-    return json({ error: 'Incorrect email or password.' }, 401)
+    return sendJson(response, 401, { error: 'Incorrect email or password.' })
   }
 
   clearFailures(ip)
-  const session = await signSession({ email: configuredEmail, exp: Date.now() + SESSION_MAX_AGE * 1000 })
-  return json({ ok: true }, 200, { 'Set-Cookie': cookieHeader(session) })
+  const session = signSession({ email: configuredEmail, exp: Date.now() + SESSION_MAX_AGE * 1000 })
+  return sendJson(response, 200, { ok: true }, { 'Set-Cookie': cookieHeader(session) })
 }

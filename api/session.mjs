@@ -1,7 +1,7 @@
-import { json } from '../lib/api.mjs'
+import { sendJson } from '../lib/api.mjs'
 import { readSessionFromCookie } from '../lib/session.mjs'
 
-export default async function handler(request) {
-  const session = await readSessionFromCookie(request.headers.get('cookie'))
-  return json({ authenticated: Boolean(session), email: session?.email ?? null })
+export default async function handler(request, response) {
+  const session = await readSessionFromCookie(request.headers.cookie)
+  sendJson(response, 200, { authenticated: Boolean(session), email: session?.email ?? null })
 }
