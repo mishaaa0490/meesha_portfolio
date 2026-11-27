@@ -4,35 +4,15 @@ import {
   AwardIcon,
   BookIcon,
   BriefcaseIcon,
-  CalculatorIcon,
-  CameraIcon,
   ChartIcon,
   CheckIcon,
   CloseIcon,
-  CoffeeIcon,
-  CookieIcon,
-  GlobeIcon,
-  LampIcon,
-  LipGlossIcon,
   MailIcon,
   MedalIcon,
   MenuIcon,
-  PaperclipIcon,
-  PhoneIcon,
-  PinIcon,
   SparkIcon,
 } from './icons'
-import {
-  accountingExpertise,
-  achievements,
-  education,
-  experience,
-  focusAreas,
-  navItems,
-  profile,
-  softSkills,
-  technicalSkills,
-} from './data'
+import { formatTemplate, useSiteContent } from './content'
 
 function useReveal() {
   useEffect(() => {
@@ -59,12 +39,14 @@ function useReveal() {
   }, [])
 }
 
-function useActiveSection() {
-  const [active, setActive] = useState('#home')
+function useActiveSection(hrefs: string[]) {
+  const [active, setActive] = useState(hrefs[0] ?? '#home')
+  const key = hrefs.join('|')
 
   useEffect(() => {
-    const sections = navItems
-      .map((item) => document.getElementById(item.href.slice(1)))
+    const sections = key
+      .split('|')
+      .map((href) => document.getElementById(href.slice(1)))
       .filter((element): element is HTMLElement => Boolean(element))
 
     const observer = new IntersectionObserver(
@@ -79,7 +61,7 @@ function useActiveSection() {
 
     sections.forEach((section) => observer.observe(section))
     return () => observer.disconnect()
-  }, [])
+  }, [key])
 
   return active
 }
@@ -128,6 +110,7 @@ function CountUp({ value, decimals = 0 }: { value: number; decimals?: number }) 
 }
 
 function Loader() {
+  const { content } = useSiteContent()
   const [done, setDone] = useState(false)
 
   useEffect(() => {
@@ -143,14 +126,22 @@ function Loader() {
 
   return (
     <div className="intro-loader" aria-hidden="true">
-      <p>
-        hello, i&apos;m Misha<span className="loader-caret" />
+      <p
+        style={
+          {
+            '--loader-width': `${`${content.loader.text} ${content.loader.name}`.length}ch`,
+          } as CSSProperties
+        }
+      >
+        {content.loader.text} {content.loader.name}
+        <span className="loader-caret" />
       </p>
     </div>
   )
 }
 
 function CursorTag() {
+  const { content } = useSiteContent()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -185,7 +176,7 @@ function CursorTag() {
   return (
     <div ref={ref} className="cursor-tag" aria-hidden="true">
       <span className="cursor-arrow" />
-      <span>misha</span>
+      <span>{content.cursor.label}</span>
     </div>
   )
 }
@@ -253,20 +244,28 @@ function SudokuBackdrop() {
 function FloatingIcons() {
   return (
     <div className="float-layer" aria-hidden="true">
-      <span className="float-icon float-icon--coffee"><CoffeeIcon width={26} height={26} /></span>
-      <span className="float-icon float-icon--lip"><LipGlossIcon width={25} height={25} /></span>
-      <span className="float-icon float-icon--calc"><CalculatorIcon width={27} height={27} /></span>
-      <span className="float-icon float-icon--camera"><CameraIcon width={28} height={28} /></span>
-      <span className="float-icon float-icon--clip"><PaperclipIcon width={26} height={26} /></span>
-      <span className="float-icon float-icon--lamp"><LampIcon width={30} height={30} /></span>
-      <span className="float-icon float-icon--globe"><GlobeIcon width={28} height={28} /></span>
-      <span className="float-icon float-icon--cookie"><CookieIcon width={26} height={26} /></span>
+      <span className="float-png float-png--calculator">
+        <img src="/—Pngtree—calculator_3774414.png" alt="" width={2816} height={2816} />
+      </span>
+      <span className="float-png float-png--rubik">
+        <img src="/—Pngtree—multicolor spinning game toy rubik's_5577449.png" alt="" width={1200} height={1200} />
+      </span>
+      <span className="float-png float-png--books">
+        <img src="/books_sketch.png" alt="" width={447} height={447} />
+      </span>
+      <span className="float-png float-png--rhode">
+        <img src="/rhode_product.png" alt="" width={480} height={638} />
+      </span>
+      <span className="float-png float-png--cat">
+        <img src="/gatita%20abogada-cutout.png" alt="" width={736} height={1104} />
+      </span>
     </div>
   )
 }
 
 function Navbar() {
-  const active = useActiveSection()
+  const { content } = useSiteContent()
+  const active = useActiveSection(content.nav.items.map((item) => item.href))
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -280,27 +279,27 @@ function Navbar() {
   return (
     <header className={`sitebar${scrolled ? ' sitebar--solid' : ''}`}>
       <div className="nav-inner">
-        <a className="brand" href="#home" aria-label="Misha Sahu — home" onClick={() => setOpen(false)}>
-          <span className="brand-name">misha sahu</span>
-          <span className="brand-sub">CA student · Udaipur</span>
+        <a className="brand" href={content.nav.items[0]?.href ?? '#home'} aria-label={content.brand.aria} onClick={() => setOpen(false)}>
+          <span className="brand-name">{content.brand.name}</span>
+          <span className="brand-sub">{content.brand.sub}</span>
         </a>
 
-        <nav className="desktop-nav" aria-label="Primary navigation">
-          {navItems.map((item) => (
+        <nav className="desktop-nav" aria-label={content.nav.primaryAria}>
+          {content.nav.items.map((item) => (
             <a key={item.href} href={item.href} className={active === item.href ? 'nav-link is-active' : 'nav-link'}>
               {item.label}
             </a>
           ))}
         </nav>
 
-        <a className="nav-cta" href="#contact">
-          say hello <ArrowIcon width={15} height={15} />
+        <a className="nav-cta" href={content.nav.items[content.nav.items.length - 1]?.href ?? '#contact'}>
+          {content.nav.cta} <ArrowIcon width={15} height={15} />
         </a>
 
         <button
           className="menu-toggle"
           type="button"
-          aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-label={open ? content.nav.closeAria : content.nav.openAria}
           aria-expanded={open}
           aria-controls="mobile-menu"
           onClick={() => setOpen((value) => !value)}
@@ -309,14 +308,18 @@ function Navbar() {
         </button>
       </div>
 
-      <nav id="mobile-menu" className={`mobile-menu${open ? ' is-open' : ''}`} aria-label="Mobile navigation" aria-hidden={!open}>
-        {navItems.map((item) => (
+      <nav id="mobile-menu" className={`mobile-menu${open ? ' is-open' : ''}`} aria-label={content.nav.mobileAria} aria-hidden={!open}>
+        {content.nav.items.map((item) => (
           <a key={item.href} href={item.href} onClick={() => setOpen(false)} tabIndex={open ? 0 : -1}>
             {item.label}
           </a>
         ))}
-        <a href="#contact" onClick={() => setOpen(false)} tabIndex={open ? 0 : -1}>
-          Say hello
+        <a
+          href={content.nav.items[content.nav.items.length - 1]?.href ?? '#contact'}
+          onClick={() => setOpen(false)}
+          tabIndex={open ? 0 : -1}
+        >
+          {content.nav.mobileCta}
         </a>
       </nav>
     </header>
@@ -324,6 +327,8 @@ function Navbar() {
 }
 
 function Hero() {
+  const { content } = useSiteContent()
+  const hero = content.hero
   const [flipped, setFlipped] = useState(false)
   const [tapePlaying, setTapePlaying] = useState(false)
 
@@ -331,13 +336,13 @@ function Hero() {
     <section id="home" className="hero">
       <div className="desk-speckles" aria-hidden="true" />
       <SudokuBackdrop />
-      <TapeMarquee items={['CA Student', 'Accounting', 'Taxation', 'Auditing', 'Financial Management']} />
+      <TapeMarquee items={hero.marqueeTop} />
       <FloatingIcons />
 
       <div className="container hero-inner">
         <div className="hero-copy">
           <div className="hero-kicker hero-stagger">
-            <span className="tape-label">a little introduction</span>
+            <span className="tape-label">{hero.tapeLabel}</span>
           </div>
 
           <button
@@ -345,72 +350,76 @@ function Hero() {
             className={`name-flip hero-stagger${flipped ? ' is-flipped' : ''}`}
             onClick={() => setFlipped((value) => !value)}
             aria-pressed={flipped}
-            aria-label={flipped ? 'Show Misha Sahu name' : 'Show Misha Sahu CA journey pass'}
+            aria-label={flipped ? hero.flip.frontAria : hero.flip.backAria}
           >
             <span className="name-flip-inner">
               <span className="name-face name-face--front">
-                <span className="hand-small">hi, i&apos;m</span>
-                <span className="hero-name">Misha Sahu</span>
-                <span className="hero-signature">Misha</span>
+                <span className="hand-small">{hero.flip.hi}</span>
+                <span className="hero-name">{hero.flip.name}</span>
+                <span className="hero-signature">{hero.flip.signature}</span>
               </span>
               <span className="name-face name-face--back">
-                <span className="pass-top">CA JOURNEY PASS</span>
+                <span className="pass-top">{hero.flip.passTop}</span>
                 <span className="pass-grid">
-                  <span><small>Name</small>Misha Sahu</span>
-                  <span><small>Status</small>CA Student</span>
-                  <span><small>Milestone</small>Group 1 passed</span>
-                  <span><small>Based in</small>Udaipur</span>
+                  {hero.flip.fields.map((field) => (
+                    <span key={field.label}>
+                      <small>{field.label}</small>
+                      {field.value}
+                    </span>
+                  ))}
                 </span>
-                <span className="pass-foot">CA Foundation → CA Intermediate</span>
+                <span className="pass-foot">{hero.flip.passFoot}</span>
               </span>
             </span>
           </button>
 
-          <p className="hero-role hero-stagger">CA Student | Accounting &amp; Finance Professional</p>
+          <p className="hero-role hero-stagger">{hero.role}</p>
 
           <div className="hero-note hero-stagger">
             <span className="note-tape" aria-hidden="true" />
-            <p>
-              Building a career in accounting, taxation, auditing and financial management — with hands-on internship
-              experience and a love for getting the details right.
-            </p>
+            <p>{hero.note}</p>
           </div>
-          <p className="hero-tiny hero-stagger">tap the name to see my CA pass ↗</p>
+          <p className="hero-tiny hero-stagger">{hero.hint}</p>
 
           <div className="hero-actions hero-stagger">
             <a className="paper-button paper-button--solid" href="#experience">
-              View My Experience <ArrowIcon width={16} height={16} />
+              {hero.actions.experience} <ArrowIcon width={16} height={16} />
             </a>
             <a className="paper-button" href="#contact">
-              Get In Touch
+              {hero.actions.contact}
             </a>
           </div>
 
-          <div className="hero-location hero-stagger">
-            <PinIcon width={15} height={15} />
-            <span>University Road, Udaipur, Rajasthan</span>
+          <div className="hero-tagline hero-stagger">
+            <SparkIcon width={15} height={15} />
+            <span>{hero.tagline}</span>
           </div>
         </div>
 
         <div className="hero-visual hero-stagger">
           <div className="polaroid">
             <span className="polaroid-tape" aria-hidden="true" />
-            <img src="/meesha.jpeg" alt="Portrait of Misha Sahu" width={900} height={1600} />
-            <span className="polaroid-caption">misha, at work</span>
+            <img src={content.images.hero} alt={hero.imageAlt} width={900} height={1600} />
+            <span className="polaroid-caption">{hero.imageCaption}</span>
           </div>
 
           <span className="sticker sticker--round" aria-hidden="true">
-            CA <br /> STUDENT
+            {hero.stickers.studentTop} <br /> {hero.stickers.studentBottom}
           </span>
           <span className="sticker sticker--group" aria-hidden="true">
-            GROUP 1 <CheckIcon width={12} height={12} />
+            {hero.stickers.group} <CheckIcon width={12} height={12} />
           </span>
-          <span className="sticker sticker--city" aria-hidden="true">UDAIPUR, RJ</span>
+          <span className="sticker sticker--city" aria-hidden="true">{hero.stickers.city}</span>
           <span className="doodle doodle--one" aria-hidden="true">✳</span>
           <span className="doodle doodle--two" aria-hidden="true">✦</span>
 
           <div className={`cassette${tapePlaying ? ' is-playing' : ''}`}>
-            <button type="button" onClick={() => setTapePlaying((value) => !value)} aria-pressed={tapePlaying}>
+            <button
+              type="button"
+              onClick={() => setTapePlaying((value) => !value)}
+              aria-pressed={tapePlaying}
+              aria-label={hero.cassette.aria}
+            >
               <span className="cassette-label">
                 <span className="cassette-reel" />
                 <span className="cassette-window">
@@ -419,57 +428,51 @@ function Hero() {
                 </span>
                 <span className="cassette-reel" />
               </span>
-              <span className="cassette-text">{tapePlaying ? 'accuracy over speed' : 'tap the tape'}</span>
+              <span className="cassette-text">{tapePlaying ? hero.cassette.playing : hero.cassette.idle}</span>
             </button>
           </div>
         </div>
       </div>
 
       <div className="container hero-stats hero-stagger">
-        <div className="hero-stat">
-          <strong><CountUp value={81.32} decimals={2} />%</strong>
-          <span>B.Com · Mohanlal Sukhadia University</span>
-        </div>
-        <div className="hero-stat">
-          <strong><CountUp value={50.66} decimals={2} />%</strong>
-          <span>CA Intermediate · Group 1</span>
-        </div>
-        <div className="hero-stat">
-          <strong><CountUp value={87} decimals={2} />%</strong>
-          <span>Class XII · Navbharat SRSEC School</span>
-        </div>
+        {hero.stats.map((stat, index) => (
+          <div className="hero-stat" key={`${stat.label}-${index}`}>
+            <strong>
+              <CountUp value={Number(stat.value) || 0} decimals={Number(stat.decimals) || 0} />
+              <span className="percent-sign">{stat.suffix}</span>
+            </strong>
+            <span>{stat.label}</span>
+          </div>
+        ))}
       </div>
 
-      <TapeMarquee items={['Accuracy', 'Reliability', 'Continuous learning', 'Career growth']} reverse tone="rose" />
+      <TapeMarquee items={hero.marqueeBottom} reverse tone="rose" />
     </section>
   )
 }
 
 function About() {
+  const { content } = useSiteContent()
+  const about = content.about
+
   return (
     <section id="about" className="section about-section">
       <div className="container about-grid">
         <div data-reveal>
-          <PaperHeading eyebrow="a little about me" title="Building a career on accuracy, discipline and continuous learning." />
-          <div className="about-sticker" aria-hidden="true">READ ME ✳</div>
+          <PaperHeading eyebrow={about.eyebrow} title={about.title} />
+          <div className="about-photo" data-reveal>
+            <img src={content.images.about} alt={about.photoAlt} width={900} height={1600} loading="lazy" />
+            <span>{about.photoCaption}</span>
+          </div>
         </div>
         <div className="about-panel" data-reveal>
-          <p className="about-lead">
-            I am a CA student and accounting-focused professional based in Udaipur, Rajasthan, building a career rooted
-            in accuracy, discipline and continuous learning.
-          </p>
-          <p>
-            My internship at IMW Services Pvt Ltd gave me practical exposure to journal entries, ledger posting, trial
-            balance preparation, bank reconciliation, GST return data preparation and invoice processing. I work with
-            Tally and MS Excel for accounting entries, data tracking and report preparation.
-          </p>
-          <p>
-            I am focused on accounting, taxation, auditing and financial management, and I am looking to contribute
-            effectively to an organisation while strengthening my technical and professional competencies under expert
-            mentorship.
-          </p>
-          <div className="focus-chips" aria-label="Areas of interest">
-            {focusAreas.map((area) => (
+          {about.paragraphs.map((paragraph, index) => (
+            <p key={index} className={index === 0 ? 'about-lead' : undefined}>
+              {paragraph}
+            </p>
+          ))}
+          <div className="focus-chips" aria-label={about.eyebrow}>
+            {about.focusAreas.map((area) => (
               <span key={area} className="focus-chip">
                 <CheckIcon width={13} height={13} /> {area}
               </span>
@@ -482,28 +485,30 @@ function About() {
 }
 
 function Education() {
-  const caJourney = education.filter((item) => item.kind === 'CA')
-  const remaining = education.filter((item) => item.kind !== 'CA')
+  const { content } = useSiteContent()
+  const education = content.education
+  const caJourney = education.items.filter((item) => item.kind === 'CA')
+  const remaining = education.items.filter((item) => item.kind !== 'CA')
 
   return (
     <section id="education" className="section education-section">
       <div className="container">
-        <PaperHeading eyebrow="my CA journey" title="One step at a time, from foundation to Group 1." />
+        <PaperHeading eyebrow={education.eyebrow} title={education.title} />
 
         <div className="ca-track" data-reveal>
           {caJourney.map((item, index) => (
-            <div className="ca-step-wrap" key={item.title}>
-              <article className={`paper-card ca-card${item.title.includes('Intermediate') ? ' ca-card--featured' : ''}`}>
+            <div className="ca-step-wrap" key={`${item.title}-${index}`}>
+              <article className={`paper-card ca-card${item.featured ? ' ca-card--featured' : ''}`}>
                 <span className="card-tape" aria-hidden="true" />
                 <div className="ca-card-top">
-                  <span className="hand-label">{item.title.includes('Intermediate') ? 'current milestone' : 'where it began'}</span>
+                  <span className="hand-label">{item.label}</span>
                   <span className="ca-date">{item.detail}</span>
                 </div>
                 <h3>{item.title}</h3>
                 <p className="ca-institute">{item.institute}</p>
                 <div className="ca-score">
                   <strong>{item.score}</strong>
-                  <span>score</span>
+                  <span>{education.labels.score}</span>
                 </div>
               </article>
               {index === 0 && (
@@ -516,8 +521,8 @@ function Education() {
         </div>
 
         <div className="education-grid">
-          {remaining.map((item) => (
-            <article className="paper-card edu-card" key={item.title} data-reveal>
+          {remaining.map((item, index) => (
+            <article className="paper-card edu-card" key={`${item.title}-${index}`} data-reveal>
               <span className="card-tape card-tape--small" aria-hidden="true" />
               <div className="edu-icon" aria-hidden="true">
                 <BookIcon width={18} height={18} />
@@ -530,7 +535,7 @@ function Education() {
               <p>{item.institute}</p>
               <div className="edu-score">
                 <strong>{item.score}</strong>
-                <span>score</span>
+                <span>{education.labels.score}</span>
               </div>
             </article>
           ))}
@@ -541,13 +546,16 @@ function Education() {
 }
 
 function Achievements() {
+  const { content } = useSiteContent()
+  const achievements = content.achievements
+
   return (
     <section id="achievements" className="section achievements-section">
       <div className="container">
-        <PaperHeading eyebrow="little wins" title="Consistency, recognised early." />
+        <PaperHeading eyebrow={achievements.eyebrow} title={achievements.title} />
         <div className="achievement-grid">
-          {achievements.map((item) => (
-            <article className="paper-card achievement-card" key={item.title} data-reveal>
+          {achievements.items.map((item, index) => (
+            <article className="paper-card achievement-card" key={`${item.title}-${index}`} data-reveal>
               <span className="card-tape" aria-hidden="true" />
               <div className="achievement-icon" aria-hidden="true">
                 {item.icon === 'award' ? <AwardIcon width={22} height={22} /> : <MedalIcon width={22} height={22} />}
@@ -563,13 +571,16 @@ function Achievements() {
 }
 
 function Experience() {
+  const { content } = useSiteContent()
+  const experience = content.experience
+
   return (
     <section id="experience" className="section experience-section">
       <div className="container">
-        <PaperHeading eyebrow="where i've worked" title="Practical exposure, applied with care." />
+        <PaperHeading eyebrow={experience.eyebrow} title={experience.title} />
         <div className="timeline">
-          {experience.map((job, index) => (
-            <article className="timeline-item" key={job.company} data-reveal>
+          {experience.items.map((job, index) => (
+            <article className="timeline-item" key={`${job.company}-${index}`} data-reveal>
               <div className="timeline-marker" aria-hidden="true">
                 <BriefcaseIcon width={16} height={16} />
               </div>
@@ -587,21 +598,21 @@ function Experience() {
                 {job.responsibilities.length > 0 ? (
                   <>
                     <ul className="responsibility-list">
-                      {job.responsibilities.map((task) => (
-                        <li key={task}>
+                      {job.responsibilities.map((task, taskIndex) => (
+                        <li key={`${task}-${taskIndex}`}>
                           <CheckIcon width={14} height={14} />
                           <span>{task}</span>
                         </li>
                       ))}
                     </ul>
-                    <div className="timeline-tags" aria-label="Areas of work">
-                      {job.tags.map((tag) => (
-                        <span key={tag}>{tag}</span>
+                    <div className="timeline-tags" aria-label={experience.eyebrow}>
+                      {job.tags.map((tag, tagIndex) => (
+                        <span key={`${tag}-${tagIndex}`}>{tag}</span>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <p className="timeline-note">Role and organisation as listed in the résumé.</p>
+                  <p className="timeline-note">{job.note}</p>
                 )}
               </div>
             </article>
@@ -613,6 +624,8 @@ function Experience() {
 }
 
 function TechnicalFolder() {
+  const { content } = useSiteContent()
+  const technical = content.skills.technical
   const [open, setOpen] = useState(false)
 
   return (
@@ -620,11 +633,11 @@ function TechnicalFolder() {
       <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
         <span className="folder-back" aria-hidden="true" />
         <span className="folder-front" aria-hidden="true" />
-        <span className="folder-label">{open ? 'close the folder' : 'open my tool folder'}</span>
+        <span className="folder-label">{open ? technical.folderOpen : technical.folderClosed}</span>
       </button>
       <div className="folder-tools" aria-hidden={!open}>
-        {technicalSkills.flatMap((group) => group.items).map((item, index) => (
-          <span key={item} style={{ '--i': index } as CSSProperties}>
+        {technical.groups.flatMap((group) => group.items).map((item, index) => (
+          <span key={`${item}-${index}`} style={{ '--i': index } as CSSProperties}>
             {item}
           </span>
         ))}
@@ -634,14 +647,17 @@ function TechnicalFolder() {
 }
 
 function Skills() {
+  const { content } = useSiteContent()
+  const skills = content.skills
+
   return (
     <section id="skills" className="skills-section">
       <div className="accounting-block">
         <div className="container">
-          <PaperHeading eyebrow="what i work with" title="The accounting core." />
+          <PaperHeading eyebrow={skills.accounting.eyebrow} title={skills.accounting.title} />
           <div className="expertise-grid">
-            {accountingExpertise.map((group) => (
-              <article className="paper-card expertise-card" key={group.title} data-reveal>
+            {skills.accounting.groups.map((group, groupIndex) => (
+              <article className="paper-card expertise-card" key={`${group.title}-${groupIndex}`} data-reveal>
                 <span className="card-tape" aria-hidden="true" />
                 <div className="expertise-card-head">
                   <span className="expertise-number" aria-hidden="true">
@@ -650,8 +666,8 @@ function Skills() {
                   <h3>{group.title}</h3>
                 </div>
                 <ul>
-                  {group.items.map((item) => (
-                    <li key={item}>
+                  {group.items.map((item, itemIndex) => (
+                    <li key={`${item}-${itemIndex}`}>
                       <span aria-hidden="true" />
                       {item}
                     </li>
@@ -664,15 +680,15 @@ function Skills() {
       </div>
 
       <div className="container technical-block">
-        <PaperHeading eyebrow="technical skills" title="Tools &amp; knowledge I work with." />
+        <PaperHeading eyebrow={skills.technical.eyebrow} title={skills.technical.title} />
         <div className="technical-grid">
-          {technicalSkills.map((group) => (
-            <article className="paper-card technical-card" key={group.title} data-reveal>
+          {skills.technical.groups.map((group, groupIndex) => (
+            <article className="paper-card technical-card" key={`${group.title}-${groupIndex}`} data-reveal>
               <span className="card-tape card-tape--small" aria-hidden="true" />
               <h3>{group.title}</h3>
               <div className="skill-badges">
-                {group.items.map((item) => (
-                  <span key={item}>{item}</span>
+                {group.items.map((item, itemIndex) => (
+                  <span key={`${item}-${itemIndex}`}>{item}</span>
                 ))}
               </div>
             </article>
@@ -680,15 +696,15 @@ function Skills() {
           <TechnicalFolder />
         </div>
         <p className="skills-note" data-reveal>
-          Accounting and compliance knowledge listed here reflects foundational understanding, not a proficiency rating.
+          {skills.technical.note}
         </p>
       </div>
 
       <div className="container soft-block">
-        <PaperHeading eyebrow="soft skills" title="How I work with people and change." />
+        <PaperHeading eyebrow={skills.soft.eyebrow} title={skills.soft.title} />
         <div className="soft-grid">
-          {softSkills.map((skill, index) => (
-            <article className={`soft-note soft-note--${index % 3}`} key={skill} data-reveal>
+          {skills.soft.items.map((skill, index) => (
+            <article className={`soft-note soft-note--${index % 3}`} key={`${skill}-${index}`} data-reveal>
               <span className="note-tape" aria-hidden="true" />
               <SparkIcon width={17} height={17} />
               <span>{skill}</span>
@@ -701,105 +717,183 @@ function Skills() {
 }
 
 function Vision() {
+  const { content } = useSiteContent()
+  const vision = content.vision
+
   return (
     <section id="vision" className="section vision-section">
       <div className="container vision-inner">
         <div data-reveal>
-          <PaperHeading eyebrow="career objective" title="Steady growth. Real responsibility. Meaningful work." />
+          <PaperHeading eyebrow={vision.eyebrow} title={vision.title} />
           <div className="quote-slip">
             <span className="note-tape" aria-hidden="true" />
-            <p>
-              I am seeking an opportunity in a reputed organisation where I can apply my knowledge of accounting,
-              taxation, auditing and financial management, gain practical experience and continue developing my
-              professional skills. As a CA student, I aim to contribute effectively while strengthening my technical and
-              professional competencies under expert mentorship.
-            </p>
+            <p>{vision.quote}</p>
           </div>
         </div>
         <div className="vision-panel" data-reveal>
-          <span className="hand-label">what I bring</span>
-          {focusAreas.map((area) => (
-            <div className="vision-row" key={area}>
+          <span className="hand-label">{vision.bringLabel}</span>
+          {vision.rows.map((row, index) => (
+            <div className="vision-row" key={`${row}-${index}`}>
               <span aria-hidden="true" />
-              {area}
+              {row}
             </div>
           ))}
-          <div className="vision-panel-foot">Continuous learning · Accuracy · Reliability</div>
+          <div className="vision-panel-foot">{vision.foot}</div>
         </div>
       </div>
     </section>
   )
 }
 
-function Contact() {
-  const [status, setStatus] = useState('')
+const CONTACT_RATE_LIMIT_KEY = 'misha-contact-submissions'
+const CONTACT_RATE_WINDOW_MS = 10 * 60 * 1000
+const CONTACT_MAX_SUBMISSIONS = 3
+const CONTACT_COOLDOWN_MS = 30 * 1000
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+function readSubmissionTimes(now: number): number[] {
+  try {
+    const saved = localStorage.getItem(CONTACT_RATE_LIMIT_KEY)
+    const parsed = saved ? JSON.parse(saved) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
+      .filter((time) => now - time < CONTACT_RATE_WINDOW_MS)
+  } catch {
+    return []
+  }
+}
+
+function writeSubmissionTimes(times: number[]) {
+  try {
+    localStorage.setItem(CONTACT_RATE_LIMIT_KEY, JSON.stringify(times))
+  } catch {
+    return
+  }
+}
+
+function getRateLimitMessage(
+  times: number[],
+  now: number,
+  status: { maxTemplate: string; cooldownTemplate: string },
+): string {
+  if (times.length >= CONTACT_MAX_SUBMISSIONS) {
+    const retryAt = (times[0] ?? now) + CONTACT_RATE_WINDOW_MS
+    const minutes = Math.max(1, Math.ceil((retryAt - now) / 60000))
+    return formatTemplate(status.maxTemplate, { minutes, plural: minutes === 1 ? '' : 's' })
+  }
+
+  const lastSubmission = times[times.length - 1] ?? 0
+  const remaining = CONTACT_COOLDOWN_MS - (now - lastSubmission)
+  if (remaining > 0) {
+    const seconds = Math.ceil(remaining / 1000)
+    return formatTemplate(status.cooldownTemplate, { seconds })
+  }
+
+  return ''
+}
+
+function Contact() {
+  const { content } = useSiteContent()
+  const contact = content.contact
+  const [status, setStatus] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const form = event.currentTarget
-    const data = new FormData(form)
-    const name = String(data.get('name') ?? '')
-    const email = String(data.get('email') ?? '')
-    const subject = String(data.get('subject') ?? '')
-    const message = String(data.get('message') ?? '')
+    const accessKey = import.meta.env.WEBFORM_KEY
+    const now = Date.now()
+    const recentSubmissions = readSubmissionTimes(now)
+    const rateLimitMessage = getRateLimitMessage(recentSubmissions, now, contact.status)
 
-    const body = `Name: ${name}\nEmail: ${email}\n\n${message}`
-    window.location.href = `mailto:${profile.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-    setStatus('Your email app should open with the message ready to send.')
-    form.reset()
+    if (rateLimitMessage) {
+      setStatus(rateLimitMessage)
+      return
+    }
+
+    if (!accessKey) {
+      setStatus(contact.status.notConfigured)
+      return
+    }
+
+    setSending(true)
+    setStatus(contact.status.sending)
+
+    const formData = new FormData(form)
+    formData.append('access_key', accessKey)
+    formData.append('from_name', contact.fromName)
+
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        writeSubmissionTimes([...recentSubmissions, now])
+        setStatus(contact.status.success)
+        form.reset()
+      } else if (response.status === 429) {
+        setStatus(contact.status.tooMany)
+      } else {
+        setStatus(contact.status.error)
+      }
+    } catch {
+      setStatus(contact.status.error)
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
     <section id="contact" className="section contact-section">
       <div className="container contact-grid">
         <div className="contact-intro" data-reveal>
-          <PaperHeading eyebrow="say hello" title="Let's connect." />
-          <p>
-            Open to opportunities in accounting, taxation, auditing and financial management. I would be glad to hear
-            from recruiters, mentors and collaborators.
-          </p>
+          <PaperHeading eyebrow={contact.eyebrow} title={contact.title} />
+          <p>{contact.intro}</p>
           <div className="contact-details">
-            <a href={`mailto:${profile.email}`}>
+            <a href={`mailto:${contact.emailAddress}`}>
               <span className="contact-icon"><MailIcon width={17} height={17} /></span>
-              <span><small>Email</small>{profile.email}</span>
+              <span><small>{contact.emailLabel}</small>{contact.emailAddress}</span>
             </a>
-            <a href={`tel:${profile.phoneHref}`}>
-              <span className="contact-icon"><PhoneIcon width={17} height={17} /></span>
-              <span><small>Phone</small>{profile.phone}</span>
-            </a>
-            <div>
-              <span className="contact-icon"><PinIcon width={17} height={17} /></span>
-              <span><small>Location</small>{profile.location}</span>
-            </div>
           </div>
         </div>
 
         <form className="retro-window" onSubmit={handleSubmit} data-reveal>
           <div className="window-bar">
-            <span>new message.txt</span>
+            <span>{contact.windowTitle}</span>
             <span aria-hidden="true">□</span>
           </div>
           <div className="window-body">
+            <input
+              type="checkbox"
+              name="botcheck"
+              className="botcheck"
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
             <div className="form-row">
               <label>
-                <span>Name</span>
-                <input name="name" type="text" autoComplete="name" placeholder="Your name" required />
+                <span>{contact.fields.name}</span>
+                <input name="name" type="text" autoComplete="name" placeholder={contact.fields.namePlaceholder} required />
               </label>
               <label>
-                <span>Email</span>
-                <input name="email" type="email" autoComplete="email" placeholder="you@example.com" required />
+                <span>{contact.fields.email}</span>
+                <input name="email" type="email" autoComplete="email" placeholder={contact.fields.emailPlaceholder} required />
               </label>
             </div>
             <label>
-              <span>Subject</span>
-              <input name="subject" type="text" placeholder="How can we connect?" required />
+              <span>{contact.fields.subject}</span>
+              <input name="subject" type="text" placeholder={contact.fields.subjectPlaceholder} required />
             </label>
             <label>
-              <span>Message</span>
-              <textarea name="message" rows={5} placeholder="Write your message here..." required />
+              <span>{contact.fields.message}</span>
+              <textarea name="message" rows={5} placeholder={contact.fields.messagePlaceholder} required />
             </label>
-            <button className="paper-button paper-button--solid" type="submit">
-              Send Message <ArrowIcon width={16} height={16} />
+            <button className="paper-button paper-button--solid" type="submit" disabled={sending}>
+              {sending ? contact.buttons.sending : contact.buttons.send} <ArrowIcon width={16} height={16} />
             </button>
             <p className="form-status" role="status" aria-live="polite">{status}</p>
           </div>
@@ -810,23 +904,27 @@ function Contact() {
 }
 
 function Footer() {
+  const { content } = useSiteContent()
+  const footer = content.footer
+
   return (
     <footer className="footer">
-      <TapeMarquee items={['Misha Sahu', 'CA Student', 'Udaipur, Rajasthan']} tone="plum" reverse />
+      <TapeMarquee items={footer.marquee} tone="plum" reverse />
       <div className="container footer-inner">
         <div>
-          <span className="footer-name">misha sahu</span>
-          <strong>{profile.role}</strong>
-          <p>{profile.shortLocation}</p>
+          <span className="footer-name">{footer.name}</span>
+          <strong>{footer.role}</strong>
+          <p>{footer.line}</p>
         </div>
         <div className="footer-links">
-          <a href={`mailto:${profile.email}`}>{profile.email}</a>
-          <a href={`tel:${profile.phoneHref}`}>{profile.phone}</a>
+          <a href={`mailto:${content.contact.emailAddress}`}>{content.contact.emailAddress}</a>
         </div>
       </div>
       <div className="container footer-bottom">
-        <span>© {new Date().getFullYear()} {profile.name}. All rights reserved.</span>
-        <a href="#home">back to the desk ↑</a>
+        <span>
+          {formatTemplate(footer.rightsTemplate, { year: new Date().getFullYear(), name: footer.rightsName })}
+        </span>
+        <a href={content.nav.items[0]?.href ?? '#home'}>{footer.back}</a>
       </div>
     </footer>
   )

@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "start": "npm run build && node server.mjs",
+    "serve": "node server.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "hash-password": "node scripts/generate-hash.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

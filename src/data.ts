@@ -2,10 +2,6 @@ export const profile = {
   name: 'Misha Sahu',
   role: 'CA Student | Accounting & Finance Professional',
   email: 'mishaaa0490@gmail.com',
-  phone: '+91 90242-70514',
-  phoneHref: '+919024270514',
-  location: 'University Road, Udaipur, Rajasthan',
-  shortLocation: 'Udaipur, Rajasthan',
 }
 
 export const navItems = [

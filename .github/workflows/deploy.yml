@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          WEBFORM_KEY: ${{ secrets.WEBFORM_KEY || vars.WEBFORM_KEY }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true
