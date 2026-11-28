@@ -24,7 +24,8 @@ export default async function handler(request, response) {
 
   try {
     await writeContent(body)
-  } catch {
+  } catch (error) {
+    console.error('[api/content] Failed to save content:', error)
     return sendJson(response, 500, { error: 'Unable to save content.' })
   }
 
