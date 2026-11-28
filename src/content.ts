@@ -595,6 +595,7 @@ type SaveStatus = 'loading' | 'saved' | 'dirty' | 'saving' | 'error'
 interface ContentContextValue {
   content: SiteContent
   saveStatus: SaveStatus
+  saveError: string
   updateAtPath: (path: Array<string | number>, value: unknown) => void
   resetContent: () => void
   retrySave: () => void
@@ -605,6 +606,7 @@ const ContentContext = createContext<ContentContextValue | null>(null)
 export function ContentProvider({ children }: { children: ReactNode }) {
   const [content, setContent] = useState<SiteContent>(defaultContent)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading')
+  const [saveError, setSaveError] = useState('')
   const hasLocalEdits = useRef(false)
 
   useEffect(() => {
@@ -636,9 +638,16 @@ export function ContentProvider({ children }: { children: ReactNode }) {
           credentials: 'same-origin',
           body: JSON.stringify(content),
         })
-        if (!response.ok) throw new Error('Save failed')
+        const result: unknown = await response.json().catch(() => ({}))
+        const detail = typeof result === 'object' && result !== null ? (result as Record<string, unknown>).detail : undefined
+        const message = typeof result === 'object' && result !== null ? (result as Record<string, unknown>).error : undefined
+        if (!response.ok) {
+          throw new Error(typeof detail === 'string' && detail ? detail : typeof message === 'string' && message ? message : 'Save failed.')
+        }
+        setSaveError('')
         setSaveStatus('saved')
-      } catch {
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Save failed.')
         setSaveStatus('error')
       }
     }, 450)
@@ -677,7 +686,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
 
   return createElement(
     ContentContext.Provider,
-    { value: { content, saveStatus, updateAtPath, resetContent, retrySave } },
+    { value: { content, saveStatus, saveError, updateAtPath, resetContent, retrySave } },
     children,
   )
 }

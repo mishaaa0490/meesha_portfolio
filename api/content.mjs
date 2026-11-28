@@ -1,5 +1,5 @@
 import { hasUnsafeKeys, isJsonRequest, originAllowed, readJson, sendJson } from '../lib/api.mjs'
-import { readContent, writeContent } from '../lib/content-store.mjs'
+import { explainBlobError, readContent, writeContent } from '../lib/content-store.mjs'
 import { readSessionFromCookie } from '../lib/session.mjs'
 
 export default async function handler(request, response) {
@@ -26,7 +26,7 @@ export default async function handler(request, response) {
     await writeContent(body)
   } catch (error) {
     console.error('[api/content] Failed to save content:', error)
-    return sendJson(response, 500, { error: 'Unable to save content.' })
+    return sendJson(response, 500, { error: 'Unable to save content.', detail: explainBlobError(error) })
   }
 
   return sendJson(response, 200, { ok: true })

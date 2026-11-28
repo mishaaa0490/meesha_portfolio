@@ -2545,6 +2545,15 @@ textarea:focus-visible {
   opacity: 1;
 }
 
+.cms-save-detail {
+  max-width: 340px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #ffd1dc;
+  opacity: 0.9;
+}
+
 .cms-primary-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;

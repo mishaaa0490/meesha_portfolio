@@ -403,7 +403,7 @@ const saveLabels: Record<string, string> = {
 }
 
 export default function AdminApp() {
-  const { content, saveStatus, updateAtPath, resetContent, retrySave } = useSiteContent()
+  const { content, saveStatus, saveError, updateAtPath, resetContent, retrySave } = useSiteContent()
   const [signedIn, setSignedIn] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [activeId, setActiveId] = useState('hero')
@@ -476,12 +476,15 @@ export default function AdminApp() {
           <span className="admin-brand-sub">content studio</span>
         </a>
         <div className="admin-topbar-actions">
-          <span className={`cms-saved cms-saved--${saveStatus}`}>
+          <span className={`cms-saved cms-saved--${saveStatus}`} title={saveError || undefined}>
             {saveStatus === 'saved' ? <CheckIcon width={13} height={13} /> : null}
             {saveLabels[saveStatus] ?? saveStatus}
           </span>
           {saveStatus === 'error' && (
-            <button type="button" className="cms-secondary-button" onClick={retrySave}>Retry save</button>
+            <>
+              {saveError ? <span className="cms-save-detail" title={saveError}>{saveError}</span> : null}
+              <button type="button" className="cms-secondary-button" onClick={retrySave}>Retry save</button>
+            </>
           )}
           <a className="cms-secondary-button" href="/" target="_blank" rel="noreferrer">
             View site <ArrowIcon width={13} height={13} />

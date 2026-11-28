@@ -6,6 +6,7 @@ import contentHandler from './api/content.mjs'
 import loginHandler from './api/login.mjs'
 import logoutHandler from './api/logout.mjs'
 import sessionHandler from './api/session.mjs'
+import statusHandler from './api/status.mjs'
 import { getAuthConfig } from './lib/config.mjs'
 import { readSessionFromCookie } from './lib/session.mjs'
 
@@ -60,6 +61,7 @@ const apiHandlers = {
   '/api/login': loginHandler,
   '/api/logout': logoutHandler,
   '/api/content': contentHandler,
+  '/api/status': statusHandler,
 }
 
 function serveStatic(request, response, pathname) {
